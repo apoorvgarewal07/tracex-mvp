@@ -87,3 +87,41 @@ export interface ForensicCase {
   riskFactors: RiskFactor[];
   investigatorNotes: string[];
 }
+
+export interface BackendHealth {
+  status: string;
+  service: string;
+  version: string;
+  environment?: string;
+  timestamp: string;
+}
+
+export interface BackendTraceListItem {
+  id: string;
+  source_wallet: string;
+  complaint_id?: string;
+  status: 'completed' | 'processing' | 'failed' | string;
+  hops_count: number;
+  risk_score: number;
+  target_vasp?: string;
+  created_at: string;
+}
+
+export interface WalletLabel {
+  address: string;
+  name: string;
+  type: 'EXCHANGE' | 'MIXER' | 'ATTACKER' | 'DEX' | string;
+  confidence: number;
+  source?: string;
+}
+
+export interface ClusteringResultData {
+  clusters: Record<string, string[]>;
+  centroids: Record<string, number[]>;
+  summary: Record<string, { description: string; count: number }>;
+}
+
+export interface ClusteringResponse {
+  trace_id: string;
+  clustering: ClusteringResultData;
+}

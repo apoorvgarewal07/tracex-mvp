@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { BackendHealth, BackendTraceListItem, WalletLabel, ClusteringResponse } from '../types';
 
 const env = (import.meta as any).env || {};
 export const API_BASE_URL = env.VITE_API_URL || 'http://localhost:8000';
@@ -90,6 +91,11 @@ export interface FreezeNoticePayload {
 }
 
 export const api = {
+  async checkHealth(): Promise<BackendHealth> {
+    const res = await apiClient.get<BackendHealth>('/api/health');
+    return res.data;
+  },
+
   async startTrace(payload: StartTracePayload): Promise<TraceResponse> {
     const res = await apiClient.post<TraceResponse>('/api/v1/trace', payload);
     return res.data;
@@ -100,8 +106,20 @@ export const api = {
     return res.data;
   },
 
-  async listTraces(): Promise<any[]> {
-    const res = await apiClient.get('/api/v1/traces');
+  async listTraces(skip: number = 0, limit: number = 50): Promise<BackendTraceListItem[]> {
+    const res = await apiClient.get<BackendTraceListItem[]>('/api/v1/traces', {
+      params: { skip, limit },
+    });
+    return res.data;
+  },
+
+  async getLabels(): Promise<WalletLabel[]> {
+    const res = await apiClient.get<WalletLabel[]>('/api/v1/labels');
+    return res.data;
+  },
+
+  async getGraph(traceId: string): Promise<any> {
+    const res = await apiClient.get(`/api/v1/graph/${traceId}`);
     return res.data;
   },
 
@@ -112,8 +130,8 @@ export const api = {
     return res.data;
   },
 
-  async clusterWallets(traceId: string): Promise<any> {
-    const res = await apiClient.post(`/api/v1/cluster/${traceId}`);
+  async clusterWallets(traceId: string): Promise<ClusteringResponse> {
+    const res = await apiClient.post<ClusteringResponse>(`/api/v1/cluster/${traceId}`);
     return res.data;
   },
 
@@ -121,3 +139,4 @@ export const api = {
     return `${WS_BASE_URL}/ws/trace/${traceId}`;
   },
 };
+

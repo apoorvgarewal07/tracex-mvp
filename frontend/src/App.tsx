@@ -8,6 +8,8 @@ import { RightPanel } from './components/RightPanel';
 import { Section91NoticeModal } from './components/Section91NoticeModal';
 import { EvidenceExportModal } from './components/EvidenceExportModal';
 import { HomeScreen } from './components/HomeScreen';
+import { RecentTracesModal } from './components/RecentTracesModal';
+import { VaspDirectoryModal } from './components/VaspDirectoryModal';
 import { api, BackendTraceDetail } from './api/client';
 import { buildForensicCaseFromBackend } from './utils/graphAdapter';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -24,6 +26,8 @@ export default function App() {
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [pinnedAddresses, setPinnedAddresses] = useState<Set<string>>(new Set());
   const [lastBackendDetail, setLastBackendDetail] = useState<BackendTraceDetail | null>(null);
+  const [isRecentTracesModalOpen, setIsRecentTracesModalOpen] = useState<boolean>(false);
+  const [isVaspDirectoryModalOpen, setIsVaspDirectoryModalOpen] = useState<boolean>(false);
 
   // Real-time WebSocket connection to backend forensics engine
   const { status: traceStatus, progress: traceProgress, latestHop } = useWebSocket(activeTraceId, {
@@ -458,8 +462,45 @@ export default function App() {
     setIsExecuting(false);
   };
 
+  // Load a trace directly from the backend database archive
+  const handleLoadBackendTrace = async (traceId: string) => {
+    setIsExecuting(true);
+    navigateToDashboard();
+    try {
+      const detail = await api.getTrace(traceId);
+      if (detail) {
+        setLastBackendDetail(detail);
+        const adaptedCase = buildForensicCaseFromBackend(
+          detail,
+          detail.hops?.[0]?.chain?.includes('POLYGON') ? 'Polygon (POL)' : 'Ethereum (ETH)',
+          detail.complaint_id
+        );
+        setCurrentCase(adaptedCase);
+        setActiveTraceId(traceId);
+        const maxH = adaptedCase.edges.length > 0
+          ? Math.max(...adaptedCase.edges.map((e) => e.hopIndex))
+          : 1;
+        setActiveHop(maxH);
+      }
+    } catch (err) {
+      console.error('Failed to load trace detail:', err);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleTraceAddressFromDirectory = (address: string) => {
+    handleExecuteTrace(address, 'Ethereum (ETH)');
+  };
+
   // Primary execution handler: triggers live backend trace, then falls back seamlessly if offline
-  const handleExecuteTrace = async (address: string, chain: string, complaintId?: string) => {
+  const handleExecuteTrace = async (
+    address: string,
+    chain: string,
+    complaintId?: string,
+    maxHops: number = 15,
+    stopAtVasp: boolean = true
+  ) => {
     navigateToDashboard();
     setIsExecuting(true);
     setActiveHop(0);
@@ -470,6 +511,8 @@ export default function App() {
         victim_wallet: address,
         chain: chain.includes('Polygon') ? 'POLYGON' : 'ETH',
         complaint_id: complaintId,
+        max_hops: maxHops,
+        stop_at_vasp: stopAtVasp,
       });
 
       if (resp && resp.trace_id) {
@@ -518,6 +561,8 @@ export default function App() {
         <HomeScreen
           onExecuteTrace={handleExecuteTrace}
           onSelectCase={handleSelectCase}
+          onOpenRecentTraces={() => setIsRecentTracesModalOpen(true)}
+          onOpenVaspDirectory={() => setIsVaspDirectoryModalOpen(true)}
           hasActiveSession={hasActiveSession}
           activeCase={currentCase}
           onReturnToDashboard={navigateToDashboard}
@@ -533,6 +578,16 @@ export default function App() {
           onClose={() => setIsExportModalOpen(false)}
           currentCase={currentCase}
         />
+        <RecentTracesModal
+          isOpen={isRecentTracesModalOpen}
+          onClose={() => setIsRecentTracesModalOpen(false)}
+          onSelectTrace={handleLoadBackendTrace}
+        />
+        <VaspDirectoryModal
+          isOpen={isVaspDirectoryModalOpen}
+          onClose={() => setIsVaspDirectoryModalOpen(false)}
+          onTraceAddress={handleTraceAddressFromDirectory}
+        />
       </>
     );
   }
@@ -544,6 +599,8 @@ export default function App() {
         currentCase={currentCase}
         onOpenNotice={() => setIsNoticeModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenRecentTraces={() => setIsRecentTracesModalOpen(true)}
+        onOpenVaspDirectory={() => setIsVaspDirectoryModalOpen(true)}
         onNavigateHome={navigateToLanding}
       />
 
@@ -556,9 +613,11 @@ export default function App() {
           onSelectCase={handleSelectCase}
           onExecuteTrace={handleExecuteTrace}
           onResetTrace={handleResetTrace}
+          onOpenRecentTraces={() => setIsRecentTracesModalOpen(true)}
+          onOpenVaspDirectory={() => setIsVaspDirectoryModalOpen(true)}
         />
 
-        {/* Center: Hero Fund-Flow Graph (With Signature Trace Pulse Animation & Usability Enhancements) */}
+        {/* Center: Hero Fund-Flow Graph */}
         <HeroGraph
           currentCase={currentCase}
           onOpenNotice={() => setIsNoticeModalOpen(true)}
@@ -574,7 +633,7 @@ export default function App() {
           onSelectDefaultCase={() => handleSelectCase(FORENSIC_CASES[0])}
         />
 
-        {/* Right: Risk Score, Identified Exchange, and Section 91 Directives */}
+        {/* Right: Risk Score, Identified Exchange, ML K-Means Clusters, and Section 91 Directives */}
         <RightPanel
           currentCase={currentCase}
           activeHop={activeHop}
@@ -595,6 +654,20 @@ export default function App() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         currentCase={currentCase}
+      />
+
+      {/* Database Traces Archive Modal */}
+      <RecentTracesModal
+        isOpen={isRecentTracesModalOpen}
+        onClose={() => setIsRecentTracesModalOpen(false)}
+        onSelectTrace={handleLoadBackendTrace}
+      />
+
+      {/* Verified VASP & Entity Directory Modal */}
+      <VaspDirectoryModal
+        isOpen={isVaspDirectoryModalOpen}
+        onClose={() => setIsVaspDirectoryModalOpen(false)}
+        onTraceAddress={handleTraceAddressFromDirectory}
       />
     </div>
   );

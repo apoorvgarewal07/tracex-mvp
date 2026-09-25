@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
 import { ForensicCase } from '../types';
 import { FORENSIC_CASES } from '../data/cases';
-import { Search, FolderOpen, User, ShieldAlert, CornerDownRight, Check, Loader2, AlertCircle } from 'lucide-react';
+import {
+  Search,
+  FolderOpen,
+  User,
+  ShieldAlert,
+  CornerDownRight,
+  Check,
+  Loader2,
+  AlertCircle,
+  Database,
+  Building2,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 
 interface LeftPanelProps {
   currentCase: ForensicCase;
   isExecuting?: boolean;
   onSelectCase: (caseItem: ForensicCase) => void;
-  onExecuteTrace: (address: string, chain: string, complaintId?: string) => void;
+  onExecuteTrace: (
+    address: string,
+    chain: string,
+    complaintId?: string,
+    maxHops?: number,
+    stopAtVasp?: boolean
+  ) => void;
   onResetTrace: () => void;
+  onOpenRecentTraces?: () => void;
+  onOpenVaspDirectory?: () => void;
 }
 
 export function LeftPanel({
@@ -17,12 +39,17 @@ export function LeftPanel({
   onSelectCase,
   onExecuteTrace,
   onResetTrace,
+  onOpenRecentTraces,
+  onOpenVaspDirectory,
 }: LeftPanelProps) {
   const [inputAddress, setInputAddress] = useState(currentCase.targetWallet);
   const [selectedChain, setSelectedChain] = useState<string>(currentCase.chain || 'Ethereum (ETH)');
   const [complaintId, setComplaintId] = useState<string>(currentCase.ncrpDocketNumber || '');
   const [copied, setCopied] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [maxHops, setMaxHops] = useState(15);
+  const [stopAtVasp, setStopAtVasp] = useState(true);
 
   const handleCaseChange = (caseId: string) => {
     const found = FORENSIC_CASES.find((c) => c.id === caseId);
@@ -47,7 +74,13 @@ export function LeftPanel({
     }
 
     setValidationError(null);
-    onExecuteTrace(cleanAddr, selectedChain.includes('Polygon') ? 'POLYGON' : 'ETH', complaintId.trim());
+    onExecuteTrace(
+      cleanAddr,
+      selectedChain.includes('Polygon') ? 'POLYGON' : 'ETH',
+      complaintId.trim(),
+      maxHops,
+      stopAtVasp
+    );
   };
 
   const handleCopy = (text: string) => {
@@ -77,9 +110,21 @@ export function LeftPanel({
 
         {/* Case Preset Selector */}
         <div className="mt-4">
-          <label htmlFor="case-record-select" className="block text-[11px] text-[#A8A399] mb-1.5 font-normal">
-            Active Police FIR / Case Presets (Real & Demo)
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="case-record-select" className="block text-[11px] text-[#A8A399] font-normal">
+              Benchmark Presets:
+            </label>
+            {onOpenRecentTraces && (
+              <button
+                type="button"
+                onClick={onOpenRecentTraces}
+                className="text-[10px] text-[#B8935F] hover:underline flex items-center gap-1 font-mono"
+              >
+                <Database className="h-3 w-3" />
+                <span>35 DB Traces</span>
+              </button>
+            )}
+          </div>
           <div className="relative">
             <select
               id="case-record-select"
@@ -89,7 +134,7 @@ export function LeftPanel({
             >
               {FORENSIC_CASES.map((c) => (
                 <option key={c.id} value={c.id} className="bg-[#1C1A1E] text-[#EDE8DE]">
-                  {c.ncrpDocketNumber} — {c.crimeCategory.slice(0, 28)}...
+                  {c.ncrpDocketNumber} — {c.crimeCategory.slice(0, 26)}...
                 </option>
               ))}
             </select>
@@ -105,7 +150,17 @@ export function LeftPanel({
             <label htmlFor="wallet-address-input" className="text-xs text-[#EDE8DE] font-medium">
               Target Wallet Address (0x...)
             </label>
-            <span className="text-[11px] text-[#B8935F]">{selectedChain}</span>
+            {onOpenVaspDirectory && (
+              <button
+                type="button"
+                onClick={onOpenVaspDirectory}
+                className="text-[10px] text-[#A8A399] hover:text-[#B8935F] flex items-center gap-1"
+                title="Browse verified addresses from directory"
+              >
+                <Building2 className="h-3 w-3" />
+                <span>Lookup Directory</span>
+              </button>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -118,7 +173,7 @@ export function LeftPanel({
                   setInputAddress(e.target.value);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="0x... (e.g. Euler, Kyber, or any EVM address)"
+                placeholder="0x... (EVM address)"
                 className={`w-full rounded border ${
                   validationError ? 'border-rose-500' : 'border-[#2E2B32]'
                 } bg-[#1C1A1E] px-3 py-2 text-xs text-[#EDE8DE] font-mono placeholder-[#7E7972] focus:border-[#B8935F] focus:outline-none transition-colors`}
@@ -154,7 +209,7 @@ export function LeftPanel({
                 type="submit"
                 id="search-address-btn"
                 disabled={isExecuting || !inputAddress.trim()}
-                className="inline-flex items-center justify-center gap-1.5 rounded border border-[#B8935F]/40 bg-[#242126] px-3 py-1.5 text-xs font-medium text-[#EDE8DE] hover:bg-[#B8935F]/20 hover:border-[#B8935F] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-1.5 rounded border border-[#B8935F]/40 bg-[#242126] px-3 py-1.5 text-xs font-medium text-[#EDE8DE] hover:bg-[#B8935F]/20 hover:border-[#B8935F] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isExecuting ? (
                   <>
@@ -168,6 +223,46 @@ export function LeftPanel({
                   </>
                 )}
               </button>
+            </div>
+
+            {/* Advanced BFS parameters expandable */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[10px] text-[#7E7972] hover:text-[#A8A399] flex items-center justify-between w-full py-1"
+              >
+                <span className="flex items-center gap-1">
+                  <Sliders className="h-3 w-3 text-[#B8935F]" />
+                  <span>Trace Options (Hops: {maxHops}, Stop at VASP: {stopAtVasp ? 'Yes' : 'No'})</span>
+                </span>
+                {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+
+              {showAdvanced && (
+                <div className="p-2.5 rounded bg-[#141215] border border-[#262429] space-y-2 mt-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[#A8A399]">Max Depth: {maxHops}</span>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={maxHops}
+                      onChange={(e) => setMaxHops(parseInt(e.target.value))}
+                      className="w-24 accent-[#B8935F] cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-[#222] pt-1.5">
+                    <span className="text-[11px] text-[#A8A399]">Halt on VASP:</span>
+                    <input
+                      type="checkbox"
+                      checked={stopAtVasp}
+                      onChange={(e) => setStopAtVasp(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-[#B8935F] rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </form>

@@ -53,3 +53,10 @@ Desktop.ini
 
 # Ponytail
 ponytail.md
+
+# Excluded documentation & planning artifacts
+architecture/
+graphify-out/
+.planning/
+c128/
+ARCHITECTURE_VS_IMPLEMENTATION.md

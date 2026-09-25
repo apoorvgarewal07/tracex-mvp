@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ForensicCase } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ForensicCase, BackendHealth } from '../types';
 import { FORENSIC_CASES } from '../data/cases';
 import { HeroEmblemNetwork } from './HeroEmblemNetwork';
 import {
@@ -11,12 +11,24 @@ import {
   AlertCircle,
   FileCheck,
   Building2,
-  ExternalLink,
+  Database,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { api } from '../api/client';
 
 interface HomeScreenProps {
-  onExecuteTrace: (address: string, chain: string, complaintId?: string) => void;
+  onExecuteTrace: (
+    address: string,
+    chain: string,
+    complaintId?: string,
+    maxHops?: number,
+    stopAtVasp?: boolean
+  ) => void;
   onSelectCase: (c: ForensicCase) => void;
+  onOpenRecentTraces?: () => void;
+  onOpenVaspDirectory?: () => void;
   hasActiveSession?: boolean;
   activeCase?: ForensicCase;
   onReturnToDashboard?: () => void;
@@ -25,6 +37,8 @@ interface HomeScreenProps {
 export function HomeScreen({
   onExecuteTrace,
   onSelectCase,
+  onOpenRecentTraces,
+  onOpenVaspDirectory,
   hasActiveSession,
   activeCase,
   onReturnToDashboard,
@@ -34,6 +48,29 @@ export function HomeScreen({
   const [complaintId, setComplaintId] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState<string>(FORENSIC_CASES[0].id);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [maxHops, setMaxHops] = useState<number>(15);
+  const [stopAtVasp, setStopAtVasp] = useState<boolean>(true);
+  const [health, setHealth] = useState<BackendHealth | null>(null);
+  const [apiOnline, setApiOnline] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .checkHealth()
+      .then((res) => {
+        if (mounted) {
+          setHealth(res);
+          setApiOnline(res?.status === 'ok');
+        }
+      })
+      .catch(() => {
+        if (mounted) setApiOnline(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleTraceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +87,7 @@ export function HomeScreen({
     }
 
     setValidationError(null);
-    onExecuteTrace(cleanAddr, selectedChain, complaintId.trim() || undefined);
+    onExecuteTrace(cleanAddr, selectedChain, complaintId.trim() || undefined, maxHops, stopAtVasp);
   };
 
   const handleLoadPreset = () => {
@@ -84,31 +121,72 @@ export function HomeScreen({
             </div>
           </div>
 
-          {/* Right Action: Return to active session if mid-session */}
-          {hasActiveSession && onReturnToDashboard && activeCase && (
-            <button
-              onClick={onReturnToDashboard}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded border border-[#B8935F]/40 bg-[#1C1A1E] hover:bg-[#252228] text-xs font-medium text-[#B8935F] transition-all shadow-sm"
-              title="Return to currently loaded investigation"
+          {/* Quick Header Actions: API Health, DB Traces, VASP Directory */}
+          <div className="flex items-center gap-3">
+            {/* Live API Badge */}
+            <div
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] border font-mono ${
+                apiOnline
+                  ? 'bg-[#3B6B54]/10 border-[#3B6B54]/30 text-[#3B6B54]'
+                  : 'bg-amber-950/20 border-amber-800/40 text-amber-400'
+              }`}
             >
-              <span>Return to Case ({activeCase.ncrpDocketNumber})</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          )}
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  apiOnline ? 'bg-[#3B6B54] animate-pulse' : 'bg-amber-400'
+                }`}
+              />
+              <span>{apiOnline ? `Backend v${health?.version || '1.0.0'} Online` : 'Simulation Mode'}</span>
+            </div>
+
+            {onOpenRecentTraces && (
+              <button
+                onClick={onOpenRecentTraces}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#2E2B32] bg-[#1C1A1E] hover:border-[#B8935F]/40 text-xs text-[#A8A399] hover:text-[#EDE8DE] transition-colors"
+                title="Open recent traces recorded in database"
+              >
+                <Database className="h-3.5 w-3.5 text-[#B8935F]" />
+                <span>DB Traces Archive</span>
+              </button>
+            )}
+
+            {onOpenVaspDirectory && (
+              <button
+                onClick={onOpenVaspDirectory}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#2E2B32] bg-[#1C1A1E] hover:border-[#B8935F]/40 text-xs text-[#A8A399] hover:text-[#EDE8DE] transition-colors"
+                title="Browse 549 verified exchanges and flagged labels"
+              >
+                <Building2 className="h-3.5 w-3.5 text-[#B8935F]" />
+                <span>VASP Directory</span>
+              </button>
+            )}
+
+            {/* Return to active session if mid-session */}
+            {hasActiveSession && onReturnToDashboard && activeCase && (
+              <button
+                onClick={onReturnToDashboard}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded border border-[#B8935F]/40 bg-[#1C1A1E] hover:bg-[#252228] text-xs font-medium text-[#B8935F] transition-all shadow-sm"
+                title="Return to currently loaded investigation"
+              >
+                <span>Return to Case ({activeCase.ncrpDocketNumber})</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* 2. Hero Stage with Ashoka Emblem Node-Network Background */}
-      <main className="flex-1 flex items-center justify-center px-6 py-12 relative z-10">
+      <main className="flex-1 flex items-center justify-center px-6 py-10 relative z-10">
         {/* Ashoka Emblem Decorative Constellation Background */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
           <HeroEmblemNetwork className="w-full max-w-[460px] md:max-w-[500px] lg:max-w-[540px] opacity-40 md:opacity-50 lg:opacity-75 translate-y-2 lg:translate-x-32" />
         </div>
 
         {/* Foreground Content Card Container */}
-        <div className="w-full max-w-2xl relative z-10 space-y-8">
+        <div className="w-full max-w-2xl relative z-10 space-y-6">
           {/* Editorial Title & Overview */}
-          <div className="text-center space-y-3">
+          <div className="text-center space-y-2.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#1C1A1E] border border-[#2E2B32] text-[11px] font-medium text-[#B8935F]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#B8935F] animate-pulse"></span>
               STATUTORY CYBER FORENSICS • SECTION 91 BNSS / CrPC DIRECTIVES
@@ -119,13 +197,13 @@ export function HomeScreen({
             </h1>
 
             <p className="text-xs sm:text-sm text-[#A8A399] max-w-xl mx-auto leading-relaxed">
-              Trace on-chain cryptocurrency theft across Ethereum and Polygon networks. Identify transit mules, aggregate fan-out peeling clusters, and attribute exit wallets to FIU-registered Indian exchanges with statutory preservation directives.
+              Trace on-chain cryptocurrency theft across Ethereum and Polygon networks. Attribute exit endpoints to FIU-registered Indian exchanges, analyze ML behavioral clusters, and export statutory freeze directives.
             </p>
           </div>
 
           {/* Central Search Input Box */}
-          <div className="panel-dossier rounded-lg p-6 border border-[#B8935F]/20 shadow-2xl backdrop-blur-md bg-[#161418]/95 space-y-5">
-            <form onSubmit={handleTraceSubmit} className="space-y-4">
+          <div className="panel-dossier rounded-lg p-6 border border-[#B8935F]/20 shadow-2xl backdrop-blur-md bg-[#161418]/95 space-y-4">
+            <form onSubmit={handleTraceSubmit} className="space-y-3.5">
               {/* Chain Selector Tabs */}
               <div>
                 <label className="block text-[11px] text-[#A8A399] mb-1.5 uppercase font-medium tracking-wider">
@@ -141,7 +219,11 @@ export function HomeScreen({
                         : 'bg-[#18161A] text-[#7E7972] border-[#2A272D] hover:text-[#EDE8DE]'
                     }`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full ${selectedChain === 'Ethereum (ETH)' ? 'bg-[#B8935F]' : 'bg-[#7E7972]'}`}></span>
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        selectedChain === 'Ethereum (ETH)' ? 'bg-[#B8935F]' : 'bg-[#7E7972]'
+                      }`}
+                    ></span>
                     Ethereum (ETH Mainnet)
                   </button>
                   <button
@@ -153,7 +235,11 @@ export function HomeScreen({
                         : 'bg-[#18161A] text-[#7E7972] border-[#2A272D] hover:text-[#EDE8DE]'
                     }`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full ${selectedChain === 'Polygon (POL)' ? 'bg-[#B8935F]' : 'bg-[#7E7972]'}`}></span>
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        selectedChain === 'Polygon (POL)' ? 'bg-[#B8935F]' : 'bg-[#7E7972]'
+                      }`}
+                    ></span>
                     Polygon (POL / PoS)
                   </button>
                 </div>
@@ -162,7 +248,7 @@ export function HomeScreen({
               {/* Wallet Address Input */}
               <div>
                 <label htmlFor="home-wallet-address" className="block text-xs font-medium text-[#EDE8DE] mb-1.5">
-                  Suspect Wallet Address (0x...)
+                  Suspect / Victim Wallet Address (0x...)
                 </label>
                 <div className="relative">
                   <input
@@ -173,7 +259,7 @@ export function HomeScreen({
                       setAddress(e.target.value);
                       if (validationError) setValidationError(null);
                     }}
-                    placeholder="0x71c... or enter target EVM wallet"
+                    placeholder="0x... (e.g. Euler Exploit, Kyber, or any EVM address)"
                     className="w-full rounded border border-[#2E2B32] bg-[#1C1A1E] px-3.5 py-2.5 text-xs text-[#EDE8DE] font-mono placeholder-[#7E7972] focus:border-[#B8935F] focus:outline-none transition-colors"
                   />
                   <Search className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-[#7E7972]" />
@@ -201,6 +287,53 @@ export function HomeScreen({
                 />
               </div>
 
+              {/* Advanced Parameters Accordion (Backend BFS settings) */}
+              <div className="rounded border border-[#262429] bg-[#141215] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="w-full px-3 py-2 text-[11px] text-[#A8A399] hover:text-[#EDE8DE] flex items-center justify-between transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Sliders className="h-3 w-3 text-[#B8935F]" />
+                    <span>Advanced Forensics Parameters (BFS Engine)</span>
+                  </div>
+                  {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+
+                {showAdvanced && (
+                  <div className="p-3 border-t border-[#262429] space-y-3 bg-[#18161A] text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[#EDE8DE] block font-medium">Max BFS Hop Depth: {maxHops}</span>
+                        <span className="text-[10px] text-[#7E7972]">Max recursive transaction tiers to trace</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={maxHops}
+                        onChange={(e) => setMaxHops(parseInt(e.target.value))}
+                        className="w-32 accent-[#B8935F] cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-[#242227]">
+                      <div>
+                        <span className="text-[#EDE8DE] block font-medium">Stop Traversal at VASP / Exchange</span>
+                        <span className="text-[10px] text-[#7E7972]">Terminate branch recursion upon KYC deposit endpoint</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={stopAtVasp}
+                        onChange={(e) => setStopAtVasp(e.target.checked)}
+                        className="h-4 w-4 accent-[#B8935F] rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Run Trace CTA */}
               <button
                 type="submit"
@@ -212,9 +345,9 @@ export function HomeScreen({
             </form>
 
             {/* Benchmark Preset Selector Divider */}
-            <div className="relative pt-4 pb-1 border-t border-[#242227]">
+            <div className="relative pt-3 pb-1 border-t border-[#242227]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] text-[#A8A399]">Or load an active benchmark police case:</span>
+                <span className="text-[11px] text-[#A8A399]">Or load benchmark police cases:</span>
                 <span className="text-[10px] text-[#B8935F] font-mono">FIU-IND Verified</span>
               </div>
 
@@ -236,17 +369,42 @@ export function HomeScreen({
                 <button
                   type="button"
                   onClick={handleLoadPreset}
-                  className="px-3 py-2 rounded bg-[#242227] hover:bg-[#2F2B33] text-xs text-[#EDE8DE] border border-[#3A363E] font-medium transition-colors flex items-center gap-1.5"
+                  className="px-3 py-2 rounded bg-[#242227] hover:bg-[#2F2B33] text-xs text-[#EDE8DE] border border-[#3A363E] font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Load Preset</span>
                   <ArrowRight className="h-3 w-3 text-[#B8935F]" />
                 </button>
               </div>
+
+              {/* Direct Link to DB Traces and VASP Directory */}
+              <div className="flex items-center justify-between pt-3 mt-3 border-t border-[#242227] text-xs">
+                {onOpenRecentTraces && (
+                  <button
+                    type="button"
+                    onClick={onOpenRecentTraces}
+                    className="text-[#B8935F] hover:underline flex items-center gap-1 text-[11px]"
+                  >
+                    <Database className="h-3 w-3" />
+                    <span>View 35 Database Traces</span>
+                  </button>
+                )}
+
+                {onOpenVaspDirectory && (
+                  <button
+                    type="button"
+                    onClick={onOpenVaspDirectory}
+                    className="text-[#A8A399] hover:text-[#EDE8DE] hover:underline flex items-center gap-1 text-[11px]"
+                  >
+                    <Building2 className="h-3 w-3 text-[#B8935F]" />
+                    <span>Explore 549 VASP Labels</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Statutory badges */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-[11px] text-[#7E7972] pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-6 text-[11px] text-[#7E7972] pt-1">
             <div className="flex items-center gap-1.5">
               <Building2 className="h-3.5 w-3.5 text-[#B8935F]" />
               <span>Section 91 BNSS Directives</span>
