@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Performance & latency benchmark suite for CryptoFraud Trace.
+Performance & latency benchmark suite for CryptoFraud Trace...
 Verifies targets:
 - 10 hops trace < 10s
 - 50 hops trace < 25s
