@@ -1,4 +1,4 @@
-# TraceX (CryptoFraud Trace)
+# TraceX 
 ## Autonomous Blockchain Forensics & Fraud Attribution Platform
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
